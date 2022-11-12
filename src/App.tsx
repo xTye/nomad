@@ -1,38 +1,41 @@
-import { Component, onMount, onCleanup } from "solid-js";
-import { Toaster } from "solid-toast";
+import { Component, onMount, onCleanup, createSignal } from "solid-js";
+import toast, { Toaster } from "solid-toast";
 import { render } from "./main/index";
+import { load } from "./main/load";
 
 const App: Component = () => {
+  const [models, setModels] = createSignal({});
   let canvas: any;
-
-  onMount(() => {
-    const ctx = canvas.getContext("2d");
-    let frame = requestAnimationFrame(loop);
-
-    function loop(t: any) {
-      frame = requestAnimationFrame(loop);
-
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-      for (let p = 0; p < imageData.data.length; p += 4) {
-        const i = p / 4;
-        const x = i % canvas.width;
-        const y = (i / canvas.height) >>> 0;
-
-        const r = 64 + (128 * x) / canvas.width + 64 * Math.sin(t / 1000);
-        const g = 64 + (128 * y) / canvas.height + 64 * Math.cos(t / 1000);
-        const b = 128;
-
-        imageData.data[p + 0] = r;
-        imageData.data[p + 1] = g;
-        imageData.data[p + 2] = b;
-        imageData.data[p + 3] = 255;
-      }
-
-      ctx.putImageData(imageData, 0, 0);
+  let gl: WebGL2RenderingContext;
+  window.addEventListener("resize", () => {
+    if (gl) {
+      gl.canvas.width = window.innerWidth;
+      gl.canvas.height = window.innerHeight;
+      gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+      render(gl, models());
     }
+  });
 
-    onCleanup(() => cancelAnimationFrame(frame));
+  onMount(async () => {
+    gl = canvas.getContext("webgl2");
+    if (!gl) return toast.error("WebGL2 not supported");
+    gl.canvas.width = window.innerWidth;
+    gl.canvas.height = window.innerHeight;
+    gl.enable(gl.DEPTH_TEST);
+    gl.lineWidth(2);
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    const models = await load(gl);
+    setModels(models);
+    render(gl, models);
+
+    //? Main game loop
+    // let frame = requestAnimationFrame(loop);
+    // function loop(time: any) {
+    //   const error = render(gl, models);
+    //   if (!error) frame = requestAnimationFrame(loop);
+    // }
+
+    // onCleanup(() => cancelAnimationFrame(frame));
   });
 
   return (

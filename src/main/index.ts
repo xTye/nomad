@@ -1,67 +1,103 @@
-import twgl from "twgl.js";
-import toast from "solid-toast";
+import {
+  m4,
+  v3,
+  setUniforms,
+  setBuffersAndAttributes,
+  drawBufferInfo,
+} from "twgl.js";
+import { characterShader } from "../main/character/shader2";
 
-// load 3d model from .obj file
-async function loadObjModel(url: string) {
-  const response = await fetch(url);
-  const text = await response.text();
-  const lines = text.split(/\r?\n/);
-  const positions = [];
-  const normals = [];
-  const uvs = [];
-  const indices = [];
-  const indexMap = new Map();
-  let index = 0;
-  for (const line of lines) {
-    const parts = line.split(" ");
-    const prefix = parts.shift();
-    if (prefix === "v") {
-      positions.push(...parts.map((p) => parseFloat(p)));
-    } else if (prefix === "vn") {
-      normals.push(...parts.map((p) => parseFloat(p)));
-    } else if (prefix === "vt") {
-      uvs.push(...parts.map((p) => parseFloat(p)));
-    } else if (prefix === "f") {
-      for (let i = 0; i < 3; ++i) {
-        const indexParts = parts[i].split("/");
-        const positionIndex = parseInt(indexParts[0]) - 1;
-        const normalIndex = parseInt(indexParts[2]) - 1;
-        const uvIndex = parseInt(indexParts[1]) - 1;
-        const key = `${positionIndex}/${normalIndex}/${uvIndex}`;
-        if (indexMap.has(key)) {
-          indices.push(indexMap.get(key));
-        } else {
-          indices.push(index);
-          indexMap.set(key, index);
-          index++;
-        }
-      }
-    }
-  }
-  return {
-    position: positions,
-    normal: normals,
-    uv: uvs,
-    indices,
+const getModelMatrix = (models: any) => {
+  const scaleMatrix = m4.scaling([
+    1 / (models.character.extents.radius * 2),
+    1 / (models.character.extents.radius * 2),
+    1 / (models.character.extents.radius * 2),
+  ]);
+  const modelCoordinates = [
+    -models.character.extents.center[0],
+    -models.character.extents.center[1],
+    -models.character.extents.center[2],
+  ];
+  const translationMatrix = m4.translation(modelCoordinates);
+  const rotationXMatrix = m4.rotationX(0 * (Math.PI / 180), m4.identity());
+  const rotationYMatrix = m4.rotationY(0 * (Math.PI / 180), m4.identity());
+  const rotationZMatrix = m4.rotationZ(0 * (Math.PI / 180), m4.identity());
+  const rotationMatrix = m4.multiply(
+    m4.multiply(rotationXMatrix, rotationYMatrix),
+    rotationZMatrix
+  );
+  return m4.multiply(
+    m4.multiply(scaleMatrix, rotationMatrix),
+    translationMatrix
+  );
+};
+
+const getCameraMatrix = (models: any) => {
+  const gaze = m4.transformDirection(
+    m4.multiply(
+      m4.rotationY(0 * (Math.PI / 180)),
+      m4.rotationX(0 * (Math.PI / 180))
+    ),
+    [0, 0, 1]
+  );
+  const eye = v3.add(
+    models.character.extents.center,
+    v3.mulScalar(gaze, 1 * (models.character.extents.radius * 2))
+  );
+  const cameraMatrix = m4.lookAt(
+    eye,
+    models.character.extents.center,
+    [0, 1, 0]
+  );
+  return m4.inverse(cameraMatrix);
+};
+
+const getProjectionMatrix = (models: any, aspect: number) => {
+  return m4.perspective(
+    70 * (Math.PI / 180),
+    aspect,
+    0.1 * (models.character.extents.radius * 2),
+    2.5 * (models.character.extents.radius * 2)
+  );
+};
+
+const renderScene = (
+  modelMatrix: any,
+  viewMatrix: any,
+  projectionMatrix: any,
+  models: any,
+  gl: WebGL2RenderingContext
+) => {
+  const info = characterShader(gl);
+  gl.useProgram(info.program);
+  const uniforms = {
+    n2c: 0,
+    modelMatrix: m4.identity(),
+    viewMatrix,
+    projectionMatrix,
   };
-}
+  setUniforms(info, uniforms);
+  models.character.buffer.map((obj: any) => {
+    setBuffersAndAttributes(gl, info, obj);
+    drawBufferInfo(gl, obj);
+  });
+};
 
-export const render = async (canvas: HTMLCanvasElement) => {
-  //const canvas = document.getElementById("c") as HTMLCanvasElement;
-  const gl = canvas.getContext("webgl2");
-
-  if (!gl) {
-    toast.error("WebGL2 not supported");
-    return;
+export const render = (gl: WebGL2RenderingContext, models: any) => {
+  try {
+    gl.clearColor(0.31, 0.31, 0.31, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    renderScene(
+      getModelMatrix(models),
+      getCameraMatrix(models),
+      getProjectionMatrix(models, gl.canvas.width / gl.canvas.height),
+      models,
+      gl
+    );
+  } catch (error: any) {
+    console.error(error);
+    return true;
   }
-  gl.enable(gl.DEPTH_TEST);
-  gl.lineWidth(2);
 
-  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-  gl.clearColor(0.31, 0.31, 0.31, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-  const obj = await loadObjModel("./main/character/raymanModel.obj");
-  //const buf = twgl.createBufferInfoFromArrays(gl, obj);
-  //console.log(buf);
+  return false;
 };
