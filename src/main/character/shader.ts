@@ -1,6 +1,6 @@
-import twgl from "twgl.js"
+import { createProgramInfo } from "twgl.js";
 
-export const characterShader = {
+const shaders = {
   vs: `#version 300 es
     precision mediump float;
 
@@ -28,7 +28,7 @@ export const characterShader = {
 
       gl_Position = projectionMatrix*viewMatrix*modelMatrix*vec4(position,1);
     }`,
-      
+
   fs: `#version 300 es
     precision mediump float;
 
@@ -99,8 +99,10 @@ export const characterShader = {
     }`,
 };
 
-return twgl.createProgramInfo(gl, [shaders.vs, shaders.fs], (message) => {
-  console.log("Program Shader compilation error\n" + message);
-  //errorBlock.style.height = "400px";
-  //errorBlock.innerHTML = "Program Shader compilation error\n" + message;
-});
+export const characterShader = (gl: WebGL2RenderingContext) => {
+  return createProgramInfo(gl, [shaders.vs, shaders.fs], (message) => {
+    console.log("Program Shader compilation error\n" + message);
+    //errorBlock.style.height = "400px";
+    //errorBlock.innerHTML = "Program Shader compilation error\n" + message;
+  });
+};
