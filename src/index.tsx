@@ -7,13 +7,14 @@ function init(): any {
   var scene = new THREE.Scene();
 
   var box = getBox(1, 1, 1);
-  box.position.y = box.geometry.parameters.height / 2;
+  // box.position.y = box.geometry.parameters.height / 2;
 
   var plane = getPlane(4);
   plane.rotation.x = Math.PI / 2;
+  plane.name = "plane-1";
 
-  scene.add(box);
   scene.add(plane);
+  plane.add(box);
 
   var camera = new THREE.PerspectiveCamera(
     45,
@@ -21,7 +22,7 @@ function init(): any {
     1,
     1000
   );
-  camera.position.set(1, 3, 5);
+  camera.position.set(2, 1, 5);
   camera.lookAt(0, 0, 0);
 
   var renderer = new THREE.WebGLRenderer(); // too streamlined
@@ -55,6 +56,18 @@ function getPlane(size: number) {
 
 function update(renderer: Renderer, scene: Scene, camera: Camera) {
   renderer.render(scene, camera);
+
+  // apply animation to object. implicitly adds to children.
+  var plane = scene.getObjectByName("plane-1");
+  if (plane) {
+    plane!.rotation.y += 0.001;
+    plane!.rotation.z += 0.005;
+  }
+
+  // // applies callback function to object & children
+  // scene.traverse((child) => {
+  //   child.scale.x += 0.001;
+  // });
 
   requestAnimationFrame(function () {
     update(renderer, scene, camera);
